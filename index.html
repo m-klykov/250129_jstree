@@ -71,6 +71,8 @@
     <button id="duplicateButton">Дублировать</button>
     <button id="deleteButton">Удалить</button>
     <button id="downloadButton">Скачать JSON</button>
+	<button id="uploadButton">Загрузить JSON</button>
+	<input type="file" id="fileInput" style="display: none;" accept=".json" >
   </div>
 
   <!-- Контейнер для дерева -->
@@ -223,19 +225,42 @@
 
       // Кнопка "Скачать JSON"
       $('#downloadButton').on('click', function () {
-        const treeData = tree.get_json();
-        const dataStr = JSON.stringify(treeData, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
+		const treeData = tree.get_json();
+		const dataStr = JSON.stringify(treeData, null, 2);
+		const blob = new Blob([dataStr], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
 
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'mindmap.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = 'mindmap.json';
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
       });
+	  
+	  // Кнопка "Загрузить JSON"
+		$('#uploadButton').on('click', function () {
+			$('#fileInput').click();
+		});
+	  
+	  $('#fileInput').on('change', function (event) {
+			const file = event.target.files[0];
+			if (!file) return;
+
+			const reader = new FileReader();
+			reader.onload = function (e) {
+				try {
+					const jsonData = JSON.parse(e.target.result);
+					tree.settings.core.data = jsonData;
+					tree.refresh();
+					localStorage.setItem('mindmap', JSON.stringify(jsonData)); // Сохраняем в localStorage
+				} catch (error) {
+					alert('Ошибка при загрузке файла. Убедитесь, что это корректный JSON.');
+				}
+			};
+			reader.readAsText(file);
+	  });
 
       // Редактирование по двойному щелчку
       $('#mindmap').on('dblclick', '.jstree-anchor', function (e) {

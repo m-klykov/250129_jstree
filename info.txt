@@ -1,0 +1,11 @@
+1) создаем проект на гитхабе
+https://github.com/m-klykov/250129_jstree.git
+
+git init
+
+git add .
+
+git config --global user.email "m.klykov@gmail.com"
+git config --global user.name "Mike"
+
+git commit -m "Initial commit"

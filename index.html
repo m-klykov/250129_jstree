@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Редактор ментальных карт</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/themes/default/style.min.css" />
+  <style>
+    /* Общие стили */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+    }
+
+    /* Тулбар */
+    .toolbar {
+      background-color: #4CAF50;
+      padding: 10px;
+      display: flex;
+      gap: 10px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .toolbar button {
+      background-color: #ffffff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.3s;
+    }
+
+    .toolbar button:hover {
+      background-color: #f1f1f1;
+    }
+
+    /* Контейнер для дерева */
+    #mindmap {
+      margin: 20px;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      font-size: 16px;
+    }
+
+    /* Увеличение отступов и размера шрифта для узлов */
+    .jstree-node {
+      margin: 8px 0;
+    }
+
+    .jstree-anchor {
+      font-size: 16px;
+      line-height: 24px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Тулбар -->
+  <div class="toolbar">
+    <button id="newButton">Новый</button>
+    <button id="editButton">Редактировать</button>
+    <button id="addNodeButton">+Элемент</button>
+    <button id="addChildButton">+Подэлемент</button>
+    <button id="copyButton">Копировать</button>
+    <button id="cutButton">Вырезать</button>
+    <button id="pasteButton">Вставить</button>
+    <button id="duplicateButton">Дублировать</button>
+    <button id="deleteButton">Удалить</button>
+    <button id="downloadButton">Скачать JSON</button>
+  </div>
+
+  <!-- Контейнер для дерева -->
+  <div id="mindmap"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js"></script>
+  <script>
+    $(document).ready(function () {
+      let clipboard = null; // Буфер обмена для копирования/вставки
+      let tree; // Переменная для хранения ссылки на дерево
+
+      // Инициализация jsTree
+      tree = $('#mindmap').jstree({
+        core: {
+          data: loadTreeData(), // Загружаем данные из localStorage
+          check_callback: true // Разрешаем редактирование и перемещение
+        },
+        plugins: ['contextmenu', 'dnd', 'state', 'types'], // Подключаем плагины
+        contextmenu: {
+          items: function (node) {
+            return {
+              edit: {
+                label: 'Редактировать',
+                action: function (data) {
+                  editNode(node);
+                }
+              },
+              addNode: {
+                label: '+Элемент',
+                action: function (data) {
+                  addNode(node);
+                }
+              },
+              addChild: {
+                label: '+Подэлемент',
+                action: function (data) {
+                  addChild(node);
+                }
+              },
+              copy: {
+                label: 'Копировать',
+                action: function (data) {
+                  copyNode(node);
+                }
+              },
+              cut: {
+                label: 'Вырезать',
+                action: function (data) {
+                  cutNode(node);
+                }
+              },
+              paste: {
+                label: 'Вставить',
+                action: function (data) {
+                  pasteNode(node);
+                }
+              },
+              duplicate: {
+                label: 'Дублировать',
+                action: function (data) {
+                  duplicateNode(node);
+                }
+              },
+              delete: {
+                label: 'Удалить',
+                action: function (data) {
+                  deleteNode(node);
+                }
+              }
+            };
+          }
+        }
+      }).jstree(true); // Сохраняем ссылку на дерево
+
+      // Автоматическое сохранение при покидании страницы
+      $(window).on('beforeunload', function () {
+        saveTreeData();
+      });
+
+      // Кнопка "Новый"
+      $('#newButton').on('click', function () {
+        tree.settings.core.data = [{ text: 'Новый элемент' }];
+        tree.refresh();
+      });
+
+      // Кнопка "Редактировать"
+      $('#editButton').on('click', function () {
+        const selectedNode = tree.get_selected();
+        if (selectedNode.length) {
+          editNode(selectedNode);
+        }
+      });
+
+      // Кнопка "+Элемент"
+      $('#addNodeButton').on('click', function () {
+        const selectedNode = tree.get_selected();
+        if (selectedNode.length) {
+          addNode(selectedNode);
+        }
+      });
+
+      // Кнопка "+Подэлемент"
+      $('#addChildButton').on('click', function () {
+        const selectedNode = tree.get_selected();
+        if (selectedNode.length) {
+          addChild(selectedNode);
+        }
+      });
+
+      // Кнопка "Копировать"
+      $('#copyButton').on('click', function () {
+        const selectedNode = tree.get_selected();
+        if (selectedNode.length) {
+          copyNode(selectedNode);
+        }
+      });
+
+      // Кнопка "Вырезать"
+      $('#cutButton').on('click', function () {
+        const selectedNode = tree.get_selected();
+        if (selectedNode.length) {
+          cutNode(selectedNode);
+        }
+      });
+
+      // Кнопка "Вставить"
+      $('#pasteButton').on('click', function () {
+        const selectedNode = tree.get_selected();
+        if (selectedNode.length) {
+          pasteNode(selectedNode);
+        }
+      });
+
+      // Кнопка "Дублировать"
+      $('#duplicateButton').on('click', function () {
+        const selectedNode = tree.get_selected();
+        if (selectedNode.length) {
+          duplicateNode(selectedNode);
+        }
+      });
+
+      // Кнопка "Удалить"
+      $('#deleteButton').on('click', function () {
+        const selectedNode = tree.get_selected();
+        if (selectedNode.length) {
+          deleteNode(selectedNode);
+        }
+      });
+
+      // Кнопка "Скачать JSON"
+      $('#downloadButton').on('click', function () {
+        const treeData = tree.get_json();
+        const dataStr = JSON.stringify(treeData, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'mindmap.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+
+      // Редактирование по двойному щелчку
+      $('#mindmap').on('dblclick', '.jstree-anchor', function (e) {
+        const node = tree.get_node(this);
+        editNode(node);
+      });
+
+      // Управление с клавиатуры
+      $(document).on('keydown', function (e) {
+        const selectedNode = tree.get_selected();
+        if (!selectedNode.length) return;
+
+        switch (e.key) {
+          case 'Enter':
+          case 'F2':
+            if (e.shiftKey) {
+				addNode(selectedNode);
+            }
+			else{
+				editNode(selectedNode);
+			}
+            break;
+          case 'Insert':
+            addChild(selectedNode);
+            break; 
+          case 'Delete':
+            deleteNode(selectedNode);
+            break;
+		  case 'c':
+		    if (e.ctrlKey){
+				copyNode(selectedNode);
+			}
+		    break;
+		  case 'x':
+		    if (e.ctrlKey){
+				cutNode(selectedNode);
+			}
+		    break;
+		  case 'v':
+		    if (e.ctrlKey){
+				pasteNode(selectedNode);
+			}
+		    break;
+        }
+      });
+
+      // Функция загрузки данных из localStorage
+      function loadTreeData() {
+        const treeData = localStorage.getItem('mindmap');
+        return treeData ? JSON.parse(treeData) : [{ text: 'Новый элемент' }];
+      }
+
+      // Функция сохранения данных в localStorage
+      function saveTreeData() {
+        const treeData = tree.get_json();
+        localStorage.setItem('mindmap', JSON.stringify(treeData));
+      }
+
+      // Функция редактирования узла
+      function editNode(node) {
+        tree.edit(node);
+      }
+
+      // Функция добавления элемента на том же уровне
+      function addNode(node) {
+        const parent = tree.get_parent(node);
+        const newNode = tree.create_node(parent, { text: 'Новый элемент' });
+        tree.select_node(node);
+		tree.edit(newNode);
+      }
+
+      // Функция добавления подэлемента
+      function addChild(node) {
+        const newNode = tree.create_node(node, { text: 'Новый подэлемент' });
+		tree.select_node(node);
+        tree.edit(newNode);
+      }
+
+      // Функция копирования узла
+      function copyNode(node) {
+        tree.copy(node);
+      }
+
+      // Функция вырезания узла
+      function cutNode(node) {
+        tree.cut(node);
+      }
+
+      // Функция вставки узла
+      function pasteNode(parentNode) {
+        tree.paste(parentNode);
+		tree.open_node(parentNode);
+      }
+
+      // Функция дублирования узла
+      function duplicateNode(node) {
+        const nodeData = tree.get_json(node);
+        const parent = tree.get_parent(node);
+        const newNode = tree.create_node(parent, nodeData);
+		tree.select_node(newNode);
+        tree.edit(newNode);
+      }
+
+      // Функция удаления узла
+      function deleteNode(node) {
+        tree.delete_node(node);
+      }
+    });
+  </script>
+</body>
+</html>

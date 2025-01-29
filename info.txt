@@ -15,3 +15,5 @@ git remote add origin https://github.com/m-klykov/250129_jstree.git
 git branch -m master main
 
 git push -u origin main
+
+git pull origin main
